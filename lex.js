@@ -14,7 +14,11 @@ const CHAR_MAP = {
   '*': 'op-multiplication',
   '/': 'op-division',
   '(': 'group-start',
-  ')': 'group-end'
+  ')': 'group-end',
+  '\r': 'blank',
+  '\n': 'blank',
+  '\t': 'blank',
+  ' ': 'blank'
 };
 
 function makeGroup(parent) {
@@ -26,39 +30,49 @@ function makeGroup(parent) {
 
 function lex(txt) {
   let currentGroup = makeGroup(null);
+  let currentIntToken = null;
 
-  for (const [index, char] of Object.entries(txt)) {
+  for (const [index, char] of [...txt].entries()) {
+    console.log({ index, char });
     const code = CHAR_MAP[char];
 
     if (!code) {
       throw new Error(`Invalid token \`${char}' at position ${index}.`);
     }
 
-    if (code === 'group-start') {
-      if (currentGroup.children.length === 0) {
-        continue;
-      }
+    if (code === 'int') {
+      currentIntToken = (currentIntToken || '') + char;
+      continue;
+    } else if (currentIntToken !== null) {
+      currentGroup.children.push({
+        _type: 'int',
+        value: currentIntToken
+      });
+      currentIntToken = null;
+    }
 
+    if (code === 'group-start') {
       currentGroup = makeGroup(currentGroup);
       continue;
     }
 
     if (code === 'group-end') {
-      if (currentGroup.children.length === 0) {
-        continue;
+      const finishedGroup = currentGroup;
+
+      if (!finishedGroup.parent) {
+        throw new Error(`Unexpected token \`)' at position ${index}.`);
       }
 
-      const finishedGroup = currentGroup;
       currentGroup = finishedGroup.parent;
       currentGroup.children.push({
-        type: 'group',
+        _type: 'group',
         children: finishedGroup.children
       });
       continue;
     }
 
     currentGroup.children.push({
-      type: 'token',
+      _type: 'token',
       value: char
     });
   }
